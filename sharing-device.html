@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Sharing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <img src="peek-a-boo.png" alt="Peek-a-boo">
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        let mediaStream = null;
+        let peerConnection = null;
+        const socket = io('http://localhost:3000');
+
+        socket.on('answer', async (data) => {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+        });
+
+        socket.on('candidate', (data) => {
+            peerConnection.addIceCandidate(new RTCIceCandidate(data));
+        });
+
+        async function startScreenSharing() {
+            try {
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        cursor: "always"
+                    },
+                    audio: false
+                });
+
+                peerConnection = new RTCPeerConnection();
+                mediaStream.getTracks().forEach(track => peerConnection.addTrack(track, mediaStream));
+
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('candidate', event.candidate);
+                    }
+                };
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                socket.emit('offer', offer);
+            } catch (ex) {
+                console.error("Error occurred: ", ex);
+                alert("Error capturing screen: " + ex.message);
+            }
+        }
+
+        // Start screen sharing automatically
+        startScreenSharing();
+    </script>
+</body>
+</html>
